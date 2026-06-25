@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import QuizSession from './QuizSession';
 
 const categories = [
   {
@@ -45,6 +47,11 @@ const categories = [
 
 const StudentDashboard = () => {
   const { profile, signOut } = useAuth();
+  const [activeQuiz, setActiveQuiz] = useState(null);
+
+  if (activeQuiz) {
+    return <QuizSession domain={activeQuiz} onExit={() => setActiveQuiz(null)} />;
+  }
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#0a0f1e', padding: '24px' }}>
@@ -98,6 +105,7 @@ const StudentDashboard = () => {
         {categories.map(cat => (
           <div
             key={cat.id}
+            onClick={() => setActiveQuiz(cat)}
             style={{
               backgroundColor: cat.priority ? '#0d1b35' : '#111827',
               border: `1px solid ${cat.priority ? '#2563eb' : '#1e3a5f'}`,
@@ -120,7 +128,6 @@ const StudentDashboard = () => {
               e.currentTarget.style.backgroundColor = cat.priority ? '#0d1b35' : '#111827';
             }}
           >
-            {/* Priority accent bar */}
             {cat.priority && (
               <div style={{
                 position: 'absolute',
@@ -133,7 +140,6 @@ const StudentDashboard = () => {
               }} />
             )}
 
-            {/* Icon */}
             <div style={{
               fontSize: '26px',
               minWidth: '40px',
@@ -143,7 +149,6 @@ const StudentDashboard = () => {
               {cat.icon}
             </div>
 
-            {/* Name + description */}
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
                 <p style={{ color: '#e5e7eb', fontSize: '15px', fontWeight: '600', margin: 0 }}>{cat.name}</p>
@@ -164,7 +169,6 @@ const StudentDashboard = () => {
               <p style={{ color: '#6b7280', fontSize: '12px', margin: 0 }}>{cat.description}</p>
             </div>
 
-            {/* Weight + progress */}
             <div style={{ textAlign: 'right', minWidth: '70px' }}>
               <p style={{
                 color: cat.priority ? '#60a5fa' : '#9ca3af',
@@ -180,7 +184,6 @@ const StudentDashboard = () => {
         ))}
       </div>
 
-      {/* Footer note */}
       <p style={{ color: '#374151', fontSize: '11px', textAlign: 'center', marginTop: '24px', letterSpacing: '0.03em' }}>
         Aligned to the 2025 NREMT EMT Certification Examination Test Plan
       </p>
