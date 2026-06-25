@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../supabaseClient';
 
 const domains = [
   { id: 1, name: 'Primary Assessment', weight: '39–43%', priority: true },
@@ -10,6 +12,32 @@ const domains = [
 
 const InstructorDashboard = () => {
   const { profile, signOut } = useAuth();
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchResults = async () => {
+      const { data, error } = await supabase
+        .from('quiz_results')
+        .select('*');
+      if (!error) setResults(data);
+      setLoading(false);
+    };
+    fetchResults();
+  }, []);
+
+  const totalStudents = [...new Set(results.map(r => r.user_id))].length;
+  const avgReadiness = results.length
+    ? Math.round(results.reduce((sum, r) => sum + r.percentage, 0) / results.length)
+    : null;
+  const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const activeThisWeek = [...new Set(results.filter(r => r.created_at > oneWeekAgo).map(r => r.user_id))].length;
+
+  const domainAvg = (domainName) => {
+    const dr = results.filter(r => r.domain_name === domainName);
+    if (!dr.length) return null;
+    return Math.round(dr.reduce((sum, r) => sum + r.percentage, 0) / dr.length);
+  };
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#0a0f1e', padding: '24px' }}>
@@ -24,15 +52,7 @@ const InstructorDashboard = () => {
         </div>
         <button
           onClick={signOut}
-          style={{
-            backgroundColor: 'transparent',
-            border: '1px solid #1e3a5f',
-            color: '#6b7280',
-            padding: '8px 16px',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '14px',
-          }}
+          style={{ backgroundColor: 'transparent', border: '1px solid #1e3a5f', color: '#6b7280', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '14px' }}
         >
           Sign Out
         </button>
@@ -41,17 +61,11 @@ const InstructorDashboard = () => {
       {/* Stats row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '32px' }}>
         {[
-          { label: 'Total Students', value: '—' },
-          { label: 'Avg. Readiness', value: '—' },
-          { label: 'Active This Week', value: '—' },
+          { label: 'Total Students', value: loading ? '...' : totalStudents || '0' },
+          { label: 'Avg. Readiness', value: loading ? '...' : avgReadiness ? `${avgReadiness}%` : '—' },
+          { label: 'Active This Week', value: loading ? '...' : activeThisWeek || '0' },
         ].map(stat => (
-          <div key={stat.label} style={{
-            backgroundColor: '#111827',
-            border: '1px solid #1e3a5f',
-            borderRadius: '12px',
-            padding: '20px',
-            textAlign: 'center',
-          }}>
+          <div key={stat.label} style={{ backgroundColor: '#111827', border: '1px solid #1e3a5f', borderRadius: '12px', padding: '20px', textAlign: 'center' }}>
             <p style={{ color: '#3b82f6', fontSize: '28px', fontWeight: '700', margin: '0 0 4px' }}>{stat.value}</p>
             <p style={{ color: '#6b7280', fontSize: '13px', margin: 0 }}>{stat.label}</p>
           </div>
@@ -65,10 +79,11 @@ const InstructorDashboard = () => {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        {domains.map(domain => (
-          <div
-            key={domain.id}
-            style={{
+        {domains.map(domain => {
+          const avg = domainAvg(domain.name);
+          const barColor = avg === null ? '#1f2937' : avg >= 70 ? '#22c55e' : '#ef4444';
+          return (
+            <div key={domain.id} style={{
               backgroundColor: domain.priority ? '#0d1b35' : '#111827',
               border: `1px solid ${domain.priority ? '#2563eb' : '#1e3a5f'}`,
               borderRadius: '12px',
@@ -78,54 +93,32 @@ const InstructorDashboard = () => {
               justifyContent: 'space-between',
               position: 'relative',
               overflow: 'hidden',
-            }}
-          >
-            {/* Priority accent bar */}
-            {domain.priority && (
-              <div style={{
-                position: 'absolute',
-                left: 0,
-                top: 0,
-                bottom: 0,
-                width: '3px',
-                backgroundColor: '#3b82f6',
-                borderRadius: '12px 0 0 12px',
-              }} />
-            )}
-
-            {/* Domain name + weight */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginLeft: domain.priority ? '8px' : '0' }}>
-              <p style={{ color: '#e5e7eb', fontSize: '14px', fontWeight: '600', margin: 0 }}>{domain.name}</p>
+            }}>
               {domain.priority && (
-                <span style={{
-                  backgroundColor: '#1d4ed8',
-                  color: '#93c5fd',
-                  fontSize: '10px',
-                  fontWeight: '700',
-                  padding: '2px 6px',
-                  borderRadius: '4px',
-                  letterSpacing: '0.05em',
-                }}>
-                  HIGH WEIGHT
-                </span>
+                <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '3px', backgroundColor: '#3b82f6', borderRadius: '12px 0 0 12px' }} />
               )}
-              <span style={{ color: domain.priority ? '#60a5fa' : '#4b5563', fontSize: '12px', fontWeight: '600' }}>
-                {domain.weight}
-              </span>
-            </div>
-
-            {/* Progress bar + value */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: '120px', backgroundColor: '#1f2937', borderRadius: '4px', height: '6px' }}>
-                <div style={{ backgroundColor: '#3b82f6', width: '0%', height: '6px', borderRadius: '4px' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginLeft: domain.priority ? '8px' : '0' }}>
+                <p style={{ color: '#e5e7eb', fontSize: '14px', fontWeight: '600', margin: 0 }}>{domain.name}</p>
+                {domain.priority && (
+                  <span style={{ backgroundColor: '#1d4ed8', color: '#93c5fd', fontSize: '10px', fontWeight: '700', padding: '2px 6px', borderRadius: '4px', letterSpacing: '0.05em' }}>
+                    HIGH WEIGHT
+                  </span>
+                )}
+                <span style={{ color: domain.priority ? '#60a5fa' : '#4b5563', fontSize: '12px', fontWeight: '600' }}>{domain.weight}</span>
               </div>
-              <p style={{ color: '#6b7280', fontSize: '13px', margin: 0, minWidth: '32px', textAlign: 'right' }}>—</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '120px', backgroundColor: '#1f2937', borderRadius: '4px', height: '6px' }}>
+                  <div style={{ backgroundColor: barColor, width: avg ? `${avg}%` : '0%', height: '6px', borderRadius: '4px', transition: 'width 0.6s ease' }} />
+                </div>
+                <p style={{ color: avg >= 70 ? '#22c55e' : avg ? '#ef4444' : '#6b7280', fontSize: '13px', margin: 0, minWidth: '36px', textAlign: 'right' }}>
+                  {avg !== null ? `${avg}%` : '—'}
+                </p>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {/* Footer note */}
       <p style={{ color: '#374151', fontSize: '11px', textAlign: 'center', marginTop: '24px', letterSpacing: '0.03em' }}>
         Aligned to the 2025 NREMT EMT Certification Examination Test Plan
       </p>
