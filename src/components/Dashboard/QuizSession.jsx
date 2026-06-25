@@ -36,10 +36,9 @@ const QuizSession = ({ domain, onExit }) => {
     };
     load();
   }, [domain.name]);
-  const saveResult = async () => {
+ const saveResult = async () => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
-
   await supabase.from('quiz_results').insert({
     user_id: user.id,
     domain_name: domain.name,
