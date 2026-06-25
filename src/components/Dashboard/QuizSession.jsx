@@ -36,17 +36,18 @@ const QuizSession = ({ domain, onExit }) => {
     };
     load();
   }, [domain.name]);
- const saveResult = async () => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-  await supabase.from('quiz_results').insert({
-    user_id: user.id,
-    domain_name: domain.name,
-    score,
-    total: questions.length,
-    percentage: Math.round((score / questions.length) * 100),
-  });
-};
+
+  const saveResult = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from('quiz_results').insert({
+      user_id: user.id,
+      domain_name: domain.name,
+      score,
+      total: questions.length,
+      percentage: Math.round((score / questions.length) * 100),
+    });
+  };
 
   const handleSelect = (idx) => {
     if (answered) return;
@@ -57,11 +58,16 @@ const QuizSession = ({ domain, onExit }) => {
     setResults(r => [...r, { correct, selected: idx, answer: questions[current].correct }]);
   };
 
- const handleNext = () => {
-  if (current + 1 >= questions.length) {
-    saveResult();
-    setFinished(true);
-  } else {
+  const handleNext = () => {
+    if (current + 1 >= questions.length) {
+      saveResult();
+      setFinished(true);
+    } else {
+      setCurrent(c => c + 1);
+      setSelected(null);
+      setAnswered(false);
+    }
+  };
 
   const pct = Math.round((score / questions.length) * 100);
 
@@ -126,10 +132,7 @@ const QuizSession = ({ domain, onExit }) => {
           ))}
         </div>
 
-        <button
-          onClick={onExit}
-          style={{ width: '100%', backgroundColor: '#1d4ed8', color: '#fff', border: 'none', padding: '14px', borderRadius: '10px', cursor: 'pointer', fontSize: '15px', fontWeight: '600' }}
-        >
+        <button onClick={onExit} style={{ width: '100%', backgroundColor: '#1d4ed8', color: '#fff', border: 'none', padding: '14px', borderRadius: '10px', cursor: 'pointer', fontSize: '15px', fontWeight: '600' }}>
           Back to Dashboard
         </button>
       </div>
@@ -142,7 +145,6 @@ const QuizSession = ({ domain, onExit }) => {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#0a0f1e', padding: '24px' }}>
       <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <button onClick={onExit} style={{ backgroundColor: 'transparent', border: '1px solid #1e3a5f', color: '#6b7280', padding: '6px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' }}>
             ← Exit
@@ -164,37 +166,14 @@ const QuizSession = ({ domain, onExit }) => {
             let borderColor = '#1e3a5f';
             let bgColor = '#111827';
             let textColor = '#e5e7eb';
-
             if (answered) {
-              if (idx === q.correct) {
-                borderColor = '#16a34a';
-                bgColor = '#052e16';
-                textColor = '#4ade80';
-              } else if (idx === selected && !isCorrect) {
-                borderColor = '#dc2626';
-                bgColor = '#1c0a0a';
-                textColor = '#f87171';
-              }
+              if (idx === q.correct) { borderColor = '#16a34a'; bgColor = '#052e16'; textColor = '#4ade80'; }
+              else if (idx === selected && !isCorrect) { borderColor = '#dc2626'; bgColor = '#1c0a0a'; textColor = '#f87171'; }
             }
-
             return (
-              <div
-                key={idx}
-                onClick={() => handleSelect(idx)}
-                style={{
-                  backgroundColor: bgColor,
-                  border: `1px solid ${borderColor}`,
-                  borderRadius: '10px',
-                  padding: '14px 16px',
-                  cursor: answered ? 'default' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  transition: 'border-color 0.15s, background-color 0.15s',
-                }}
+              <div key={idx} onClick={() => handleSelect(idx)} style={{ backgroundColor: bgColor, border: `1px solid ${borderColor}`, borderRadius: '10px', padding: '14px 16px', cursor: answered ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: '12px', transition: 'border-color 0.15s, background-color 0.15s' }}
                 onMouseEnter={e => { if (!answered) e.currentTarget.style.borderColor = '#3b82f6'; }}
-                onMouseLeave={e => { if (!answered) e.currentTarget.style.borderColor = '#1e3a5f'; }}
-              >
+                onMouseLeave={e => { if (!answered) e.currentTarget.style.borderColor = '#1e3a5f'; }}>
                 <span style={{ color: '#4b5563', fontSize: '13px', fontWeight: '700', minWidth: '20px' }}>{LETTERS[idx]}</span>
                 <span style={{ color: textColor, fontSize: '14px' }}>{opt}</span>
               </div>
@@ -204,23 +183,13 @@ const QuizSession = ({ domain, onExit }) => {
 
         {answered && (
           <div>
-            <div style={{
-              backgroundColor: isCorrect ? '#052e16' : '#1c0a0a',
-              border: `1px solid ${isCorrect ? '#16a34a' : '#dc2626'}`,
-              borderRadius: '10px',
-              padding: '16px',
-              marginBottom: '16px',
-            }}>
+            <div style={{ backgroundColor: isCorrect ? '#052e16' : '#1c0a0a', border: `1px solid ${isCorrect ? '#16a34a' : '#dc2626'}`, borderRadius: '10px', padding: '16px', marginBottom: '16px' }}>
               <p style={{ color: isCorrect ? '#4ade80' : '#f87171', fontSize: '13px', fontWeight: '700', margin: '0 0 6px' }}>
                 {isCorrect ? '✓ Correct' : `✗ Incorrect — Correct answer: ${LETTERS[q.correct]}`}
               </p>
               <p style={{ color: '#9ca3af', fontSize: '13px', margin: 0 }}>{q.explanation}</p>
             </div>
-
-            <button
-              onClick={handleNext}
-              style={{ width: '100%', backgroundColor: '#1d4ed8', color: '#fff', border: 'none', padding: '14px', borderRadius: '10px', cursor: 'pointer', fontSize: '15px', fontWeight: '600' }}
-            >
+            <button onClick={handleNext} style={{ width: '100%', backgroundColor: '#1d4ed8', color: '#fff', border: 'none', padding: '14px', borderRadius: '10px', cursor: 'pointer', fontSize: '15px', fontWeight: '600' }}>
               {current + 1 >= questions.length ? 'See Results' : 'Next Question →'}
             </button>
           </div>
