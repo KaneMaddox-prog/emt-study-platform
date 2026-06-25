@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { supabase } from '../supabaseClient';
 
 const generateQuestions = async (domainName) => {
   const response = await fetch('/api/generate-questions', {
@@ -35,6 +36,18 @@ const QuizSession = ({ domain, onExit }) => {
     };
     load();
   }, [domain.name]);
+  const saveResult = async () => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  await supabase.from('quiz_results').insert({
+    user_id: user.id,
+    domain_name: domain.name,
+    score,
+    total: questions.length,
+    percentage: Math.round((score / questions.length) * 100),
+  });
+};
 
   const handleSelect = (idx) => {
     if (answered) return;
@@ -45,15 +58,11 @@ const QuizSession = ({ domain, onExit }) => {
     setResults(r => [...r, { correct, selected: idx, answer: questions[current].correct }]);
   };
 
-  const handleNext = () => {
-    if (current + 1 >= questions.length) {
-      setFinished(true);
-    } else {
-      setCurrent(c => c + 1);
-      setSelected(null);
-      setAnswered(false);
-    }
-  };
+ const handleNext = () => {
+  if (current + 1 >= questions.length) {
+    saveResult();
+    setFinished(true);
+  } else {
 
   const pct = Math.round((score / questions.length) * 100);
 
