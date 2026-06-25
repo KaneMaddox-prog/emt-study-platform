@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../supabaseClient';
+import { supabase } from '../../supabaseClient';
 
 const generateQuestions = async (domainName) => {
   const response = await fetch('/api/generate-questions', {
@@ -171,7 +171,8 @@ const QuizSession = ({ domain, onExit }) => {
               else if (idx === selected && !isCorrect) { borderColor = '#dc2626'; bgColor = '#1c0a0a'; textColor = '#f87171'; }
             }
             return (
-              <div key={idx} onClick={() => handleSelect(idx)} style={{ backgroundColor: bgColor, border: `1px solid ${borderColor}`, borderRadius: '10px', padding: '14px 16px', cursor: answered ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: '12px', transition: 'border-color 0.15s, background-color 0.15s' }}
+              <div key={idx} onClick={() => handleSelect(idx)}
+                style={{ backgroundColor: bgColor, border: `1px solid ${borderColor}`, borderRadius: '10px', padding: '14px 16px', cursor: answered ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: '12px', transition: 'border-color 0.15s, background-color 0.15s' }}
                 onMouseEnter={e => { if (!answered) e.currentTarget.style.borderColor = '#3b82f6'; }}
                 onMouseLeave={e => { if (!answered) e.currentTarget.style.borderColor = '#1e3a5f'; }}>
                 <span style={{ color: '#4b5563', fontSize: '13px', fontWeight: '700', minWidth: '20px' }}>{LETTERS[idx]}</span>
