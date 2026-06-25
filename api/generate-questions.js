@@ -1,4 +1,4 @@
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
   const { domainName } = req.body;
@@ -34,3 +34,4 @@ Make questions realistic, clinical, and at EMT certification difficulty level.`,
   const text = data.content[0].text;
   const clean = text.replace(/```json|```/g, '').trim();
   res.status(200).json(JSON.parse(clean));
+};
