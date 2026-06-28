@@ -40,7 +40,17 @@ Make questions realistic, clinical, and at EMT certification difficulty level.`,
 
     const text = data.content[0].text;
     const clean = text.replace(/```json|```/g, '').trim();
-    res.status(200).json(JSON.parse(clean));
+    const parsed = JSON.parse(clean);
+
+    const letters = ['A', 'B', 'C', 'D'];
+    const normalized = parsed.map(q => ({
+      question: q.question,
+      options: q.options,
+      correct_answer: letters[q.correct],
+      explanation: q.explanation,
+    }));
+
+    res.status(200).json({ questions: normalized });
   } catch (err) {
     console.error('Handler error:', err);
     res.status(500).json({ error: err.message });
