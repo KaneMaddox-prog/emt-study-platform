@@ -48,7 +48,7 @@ const LoginPage = ({ onSuccess }) => {
         {/* Logo / Title */}
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <h1 style={{ color: '#3b82f6', fontSize: '28px', fontWeight: '700', margin: 0 }}>
-            RescueIQ
+            Certavi
           </h1>
           <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '6px' }}>
             {mode === 'login' ? 'Sign in to your account' : 'Create your account'}
