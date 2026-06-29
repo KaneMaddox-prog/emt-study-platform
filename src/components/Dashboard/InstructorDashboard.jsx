@@ -171,7 +171,7 @@ const InstructorDashboard = () => {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div>
-          <h1 style={{ color: '#3b82f6', fontSize: '24px', fontWeight: '700', margin: 0 }}>RescueIQ</h1>
+          <h1 style={{ color: '#3b82f6', fontSize: '24px', fontWeight: '700', margin: 0 }}>Certavi</h1>
           <p style={{ color: '#6b7280', fontSize: '14px', margin: '4px 0 0' }}>
             Instructor: {profile?.full_name || 'Instructor'}
           </p>
