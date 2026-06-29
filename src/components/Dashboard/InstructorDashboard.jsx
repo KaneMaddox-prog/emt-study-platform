@@ -13,6 +13,7 @@ const domains = [
 const InstructorDashboard = () => {
   const { profile, signOut } = useAuth();
   const [results, setResults] = useState([]);
+  const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [questions, setQuestions] = useState([]);
@@ -20,12 +21,16 @@ const InstructorDashboard = () => {
   const [selectedDomain, setSelectedDomain] = useState(domains[0].name);
 
   useEffect(() => {
-    const fetchResults = async () => {
-      const { data, error } = await supabase.from('quiz_results').select('*');
-      if (!error) setResults(data);
+    const fetchData = async () => {
+      const [{ data: resultsData }, { data: profilesData }] = await Promise.all([
+        supabase.from('quiz_results').select('*'),
+        supabase.from('profiles').select('*').eq('role', 'student'),
+      ]);
+      if (resultsData) setResults(resultsData);
+      if (profilesData) setProfiles(profilesData);
       setLoading(false);
     };
-    fetchResults();
+    fetchData();
   }, []);
 
   useEffect(() => {
@@ -98,6 +103,68 @@ const InstructorDashboard = () => {
     return '#f59e0b';
   };
 
+  // Class Risk Dashboard logic
+  const buildStudentRisk = () => {
+    // Get all unique student IDs from results + profiles
+    const allStudentIds = [...new Set([
+      ...profiles.map(p => p.id),
+      ...results.map(r => r.user_id),
+    ])];
+
+    return allStudentIds.map(userId => {
+      const profile = profiles.find(p => p.id === userId);
+      const studentResults = results.filter(r => r.user_id === userId);
+      const name = profile?.full_name || 'Unknown Student';
+      const quizCount = studentResults.length;
+
+      if (quizCount === 0) {
+        return { userId, name, quizCount: 0, avgScore: null, weakestDomain: null, dangerFlag: false, risk: 'No Activity' };
+      }
+
+      const avgScore = Math.round(studentResults.reduce((sum, r) => sum + r.percentage, 0) / quizCount);
+
+      // Per-domain averages
+      const domainScores = domains.map(d => {
+        const dr = studentResults.filter(r => r.domain_name === d.name);
+        if (!dr.length) return { name: d.name, avg: null };
+        return { name: d.name, avg: Math.round(dr.reduce((sum, r) => sum + r.percentage, 0) / dr.length) };
+      }).filter(d => d.avg !== null);
+
+      const weakestDomain = domainScores.length
+        ? domainScores.reduce((a, b) => a.avg < b.avg ? a : b)
+        : null;
+
+      // Danger flag: high confidence + score < 70
+      const dangerFlag = studentResults.some(r => r.confidence === 'High' && r.percentage < 70);
+
+      // Risk level
+      let risk;
+      if (avgScore >= 80) risk = 'On Track';
+      else if (avgScore >= 70) risk = 'Monitor';
+      else risk = 'At Risk';
+
+      return { userId, name, quizCount, avgScore, weakestDomain, dangerFlag, risk };
+    });
+  };
+
+  const riskColor = (risk) => {
+    if (risk === 'On Track') return '#22c55e';
+    if (risk === 'Monitor') return '#d97706';
+    if (risk === 'At Risk') return '#ef4444';
+    return '#4b5563';
+  };
+
+  const riskBg = (risk) => {
+    if (risk === 'On Track') return '#052e16';
+    if (risk === 'Monitor') return '#1c1000';
+    if (risk === 'At Risk') return '#1c0a0a';
+    return '#111827';
+  };
+
+  const studentRiskData = buildStudentRisk();
+  const atRiskCount = studentRiskData.filter(s => s.risk === 'At Risk').length;
+  const dangerCount = studentRiskData.filter(s => s.dangerFlag).length;
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#0a0f1e', padding: '24px' }}>
 
@@ -119,7 +186,7 @@ const InstructorDashboard = () => {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '28px' }}>
-        {['dashboard', 'questions'].map(tab => (
+        {['dashboard', 'risk', 'questions'].map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -134,14 +201,13 @@ const InstructorDashboard = () => {
               color: activeTab === tab ? '#fff' : '#6b7280',
             }}
           >
-            {tab === 'dashboard' ? 'Dashboard' : 'Question Review'}
+            {tab === 'dashboard' ? 'Dashboard' : tab === 'risk' ? 'Class Risk' : 'Question Review'}
           </button>
         ))}
       </div>
 
       {activeTab === 'dashboard' && (
         <>
-          {/* Stats row */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '32px' }}>
             {[
               { label: 'Total Students', value: loading ? '...' : totalStudents || '0' },
@@ -155,7 +221,6 @@ const InstructorDashboard = () => {
             ))}
           </div>
 
-          {/* Domain performance */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '16px' }}>
             <h2 style={{ color: '#e5e7eb', fontSize: '16px', fontWeight: '600', margin: 0 }}>Class Performance by Domain</h2>
             <span style={{ color: '#4b5563', fontSize: '11px', letterSpacing: '0.05em' }}>2025 TEST PLAN</span>
@@ -202,9 +267,80 @@ const InstructorDashboard = () => {
         </>
       )}
 
+      {activeTab === 'risk' && (
+        <div>
+          {/* Risk summary stats */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '28px' }}>
+            {[
+              { label: 'Total Students', value: studentRiskData.length, color: '#3b82f6' },
+              { label: 'At Risk', value: atRiskCount, color: '#ef4444' },
+              { label: 'Danger Flags', value: dangerCount, color: '#f59e0b' },
+            ].map(stat => (
+              <div key={stat.label} style={{ backgroundColor: '#111827', border: '1px solid #1e3a5f', borderRadius: '12px', padding: '20px', textAlign: 'center' }}>
+                <p style={{ color: stat.color, fontSize: '28px', fontWeight: '700', margin: '0 0 4px' }}>{stat.value}</p>
+                <p style={{ color: '#6b7280', fontSize: '13px', margin: 0 }}>{stat.label}</p>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '16px' }}>
+            <h2 style={{ color: '#e5e7eb', fontSize: '16px', fontWeight: '600', margin: 0 }}>Student Risk Assessment</h2>
+            <span style={{ color: '#4b5563', fontSize: '11px' }}>⚠ = High confidence + failing score</span>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {studentRiskData
+              .sort((a, b) => {
+                const order = { 'At Risk': 0, 'Monitor': 1, 'On Track': 2, 'No Activity': 3 };
+                return order[a.risk] - order[b.risk];
+              })
+              .map(student => (
+                <div key={student.userId} style={{
+                  backgroundColor: riskBg(student.risk),
+                  border: `1px solid ${riskColor(student.risk)}44`,
+                  borderRadius: '12px',
+                  padding: '16px 20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '12px',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {student.dangerFlag && (
+                      <span style={{ fontSize: '16px' }} title="High confidence + failing score">⚠️</span>
+                    )}
+                    <div>
+                      <p style={{ color: '#e5e7eb', fontSize: '14px', fontWeight: '600', margin: '0 0 2px' }}>{student.name}</p>
+                      <p style={{ color: '#4b5563', fontSize: '12px', margin: 0 }}>
+                        {student.quizCount} quiz{student.quizCount !== 1 ? 'zes' : ''} taken
+                        {student.weakestDomain ? ` · Weakest: ${student.weakestDomain.name} (${student.weakestDomain.avg}%)` : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    {student.avgScore !== null && (
+                      <p style={{ color: '#e5e7eb', fontSize: '20px', fontWeight: '700', margin: 0 }}>{student.avgScore}%</p>
+                    )}
+                    <span style={{
+                      backgroundColor: riskColor(student.risk) + '22',
+                      color: riskColor(student.risk),
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      letterSpacing: '0.05em',
+                      textTransform: 'uppercase',
+                    }}>{student.risk}</span>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
       {activeTab === 'questions' && (
         <div>
-          {/* Generate controls */}
           <div style={{ backgroundColor: '#111827', border: '1px solid #1e3a5f', borderRadius: '12px', padding: '20px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
             <select
               value={selectedDomain}
@@ -222,7 +358,6 @@ const InstructorDashboard = () => {
             </button>
           </div>
 
-          {/* Question list */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {questions.length === 0 && (
               <p style={{ color: '#4b5563', textAlign: 'center', marginTop: '40px' }}>No questions yet. Generate some above.</p>
