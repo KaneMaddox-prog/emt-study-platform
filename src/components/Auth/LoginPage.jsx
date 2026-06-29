@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 
 const LoginPage = ({ onSuccess }) => {
@@ -10,6 +10,19 @@ const LoginPage = ({ onSuccess }) => {
   const [fullName, setFullName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [inviteToken, setInviteToken] = useState(null);
+  const [hasInvite, setHasInvite] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('invite');
+    if (token) {
+      setInviteToken(token);
+      setHasInvite(true);
+      setMode('signup');
+      setRole('instructor');
+    }
+  }, []);
 
   const handleSubmit = async () => {
     setError('');
@@ -18,7 +31,7 @@ const LoginPage = ({ onSuccess }) => {
       if (mode === 'login') {
         await signIn(email, password);
       } else {
-        await signUp(email, password, fullName, role);
+        await signUp(email, password, fullName, role, role === 'instructor' ? inviteToken : null);
       }
       if (onSuccess) onSuccess();
     } catch (err) {
@@ -50,6 +63,11 @@ const LoginPage = ({ onSuccess }) => {
           <h1 style={{ color: '#3b82f6', fontSize: '28px', fontWeight: '700', margin: 0 }}>
             Certavi
           </h1>
+          {hasInvite && (
+            <div style={{ backgroundColor: '#052e16', border: '1px solid #16a34a', borderRadius: '8px', padding: '8px 12px', marginTop: '12px' }}>
+              <p style={{ color: '#22c55e', fontSize: '13px', margin: 0 }}>✓ Instructor invite detected</p>
+            </div>
+          )}
           <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '6px' }}>
             {mode === 'login' ? 'Sign in to your account' : 'Create your account'}
           </p>
@@ -97,28 +115,34 @@ const LoginPage = ({ onSuccess }) => {
           style={inputStyle}
         />
 
-        {/* Role selector (signup only) */}
-        {mode === 'signup' && (
+        {/* Role selector (signup only, hidden if invite detected) */}
+        {mode === 'signup' && !hasInvite && (
           <div style={{ marginBottom: '16px' }}>
             <p style={{ color: '#9ca3af', fontSize: '13px', marginBottom: '8px' }}>I am a:</p>
             <div style={{ display: 'flex', gap: '10px' }}>
-              {['student', 'instructor'].map(r => (
-                <button key={r} onClick={() => setRole(r)} style={{
-                  flex: 1,
-                  padding: '10px',
-                  borderRadius: '8px',
-                  border: `2px solid ${role === r ? '#3b82f6' : '#1e3a5f'}`,
-                  backgroundColor: role === r ? '#1e3a5f' : 'transparent',
-                  color: role === r ? '#fff' : '#6b7280',
-                  cursor: 'pointer',
-                  fontWeight: '600',
-                  fontSize: '14px',
-                  textTransform: 'capitalize',
-                }}>
-                  {r}
-                </button>
-              ))}
+              <button onClick={() => setRole('student')} style={{
+                flex: 1,
+                padding: '10px',
+                borderRadius: '8px',
+                border: `2px solid ${role === 'student' ? '#3b82f6' : '#1e3a5f'}`,
+                backgroundColor: role === 'student' ? '#1e3a5f' : 'transparent',
+                color: role === 'student' ? '#fff' : '#6b7280',
+                cursor: 'pointer',
+                fontWeight: '600',
+                fontSize: '14px',
+              }}>
+                Student
+              </button>
             </div>
+            <p style={{ color: '#4b5563', fontSize: '11px', marginTop: '8px' }}>
+              Instructor accounts require an invite link.
+            </p>
+          </div>
+        )}
+
+        {hasInvite && mode === 'signup' && (
+          <div style={{ marginBottom: '16px' }}>
+            <p style={{ color: '#6b7280', fontSize: '13px' }}>Signing up as: <span style={{ color: '#22c55e', fontWeight: '600' }}>Instructor</span></p>
           </div>
         )}
 
@@ -157,4 +181,4 @@ const inputStyle = {
   boxSizing: 'border-box',
 };
 
-export default LoginPage
+export default LoginPage;

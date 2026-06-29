@@ -36,16 +36,49 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   };
 
-  const signUp = async (email, password, fullName, role = 'student') => {
+  const signUp = async (email, password, fullName, role = 'student', inviteToken = null) => {
+    // If signing up as instructor, validate invite token
+    if (role === 'instructor') {
+      if (!inviteToken) {
+        throw new Error('An invite token is required to create an instructor account.');
+      }
+
+      const { data: invite, error: inviteError } = await supabase
+        .from('instructor_invites')
+        .select('*')
+        .eq('token', inviteToken)
+        .is('used_by', null)
+        .single();
+
+      if (inviteError || !invite) {
+        throw new Error('Invalid or already used invite token.');
+      }
+
+      // Check expiry if set
+      if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
+        throw new Error('This invite token has expired.');
+      }
+    }
+
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
+
     if (data.user) {
       await supabase.from('profiles').upsert({
         id: data.user.id,
         full_name: fullName,
         role,
       });
+
+      // Mark invite as used
+      if (role === 'instructor' && inviteToken) {
+        await supabase
+          .from('instructor_invites')
+          .update({ used_by: data.user.id, used_at: new Date().toISOString() })
+          .eq('token', inviteToken);
+      }
     }
+
     return data;
   };
 
