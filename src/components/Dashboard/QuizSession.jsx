@@ -12,8 +12,6 @@ const fetchApprovedQuestions = async (domainName) => {
   if (error) throw error;
   if (!data || data.length === 0) throw new Error('No approved questions available for this domain.');
 
-  console.log('Raw data from Supabase:', data);
-
   const letterToIndex = { A: 0, B: 1, C: 2, D: 3 };
 
   const mapped = data.map(q => ({
@@ -37,6 +35,7 @@ const QuizSession = ({ domain, onExit }) => {
   const [answered, setAnswered] = useState(false);
   const [score, setScore] = useState(0);
   const [finished, setFinished] = useState(false);
+  const [showConfidence, setShowConfidence] = useState(false);
   const [results, setResults] = useState([]);
 
   useEffect(() => {
@@ -53,7 +52,7 @@ const QuizSession = ({ domain, onExit }) => {
     load();
   }, [domain.name]);
 
-  const saveResult = async () => {
+  const saveResult = async (confidence) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     await supabase.from('quiz_results').insert({
@@ -62,6 +61,7 @@ const QuizSession = ({ domain, onExit }) => {
       score,
       total: questions.length,
       percentage: Math.round((score / questions.length) * 100),
+      confidence,
     });
   };
 
@@ -76,13 +76,18 @@ const QuizSession = ({ domain, onExit }) => {
 
   const handleNext = () => {
     if (current + 1 >= questions.length) {
-      saveResult();
-      setFinished(true);
+      setShowConfidence(true);
     } else {
       setCurrent(c => c + 1);
       setSelected(null);
       setAnswered(false);
     }
+  };
+
+  const handleConfidence = async (level) => {
+    await saveResult(level);
+    setShowConfidence(false);
+    setFinished(true);
   };
 
   const pct = Math.round((score / questions.length) * 100);
@@ -101,6 +106,42 @@ const QuizSession = ({ domain, onExit }) => {
       <button onClick={onExit} style={{ backgroundColor: '#1e3a5f', color: '#e5e7eb', border: 'none', padding: '10px 24px', borderRadius: '8px', cursor: 'pointer' }}>
         Back to Dashboard
       </button>
+    </div>
+  );
+
+  if (showConfidence) return (
+    <div style={{ minHeight: '100vh', backgroundColor: '#0a0f1e', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+      <div style={{ maxWidth: '480px', width: '100%', backgroundColor: '#111827', border: '1px solid #1e3a5f', borderRadius: '16px', padding: '36px', textAlign: 'center' }}>
+        <p style={{ color: '#6b7280', fontSize: '12px', letterSpacing: '0.1em', textTransform: 'uppercase', margin: '0 0 12px' }}>Quiz Complete</p>
+        <p style={{ color: '#e5e7eb', fontSize: '20px', fontWeight: '700', margin: '0 0 8px' }}>How confident did you feel?</p>
+        <p style={{ color: '#6b7280', fontSize: '13px', margin: '0 0 32px' }}>Be honest — this helps your instructor identify where you need support.</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {[
+            { level: 'High', description: 'I knew the material well', color: '#16a34a', bg: '#052e16', border: '#16a34a' },
+            { level: 'Medium', description: 'I was unsure on several questions', color: '#d97706', bg: '#1c1000', border: '#d97706' },
+            { level: 'Low', description: 'I was guessing on most questions', color: '#dc2626', bg: '#1c0a0a', border: '#dc2626' },
+          ].map(({ level, description, color, bg, border }) => (
+            <button
+              key={level}
+              onClick={() => handleConfidence(level)}
+              style={{
+                backgroundColor: bg,
+                border: `1px solid ${border}`,
+                borderRadius: '10px',
+                padding: '16px 20px',
+                cursor: 'pointer',
+                textAlign: 'left',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <span style={{ color, fontSize: '15px', fontWeight: '700' }}>{level}</span>
+              <span style={{ color: '#6b7280', fontSize: '13px' }}>{description}</span>
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 
