@@ -1,13 +1,29 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 
-const generateQuestions = async (domainName) => {
-  const response = await fetch('/api/generate-questions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ domainName }),
-  });
-  return await response.json();
+const fetchApprovedQuestions = async (domainName) => {
+  const { data, error } = await supabase
+    .from('questions')
+    .select('*')
+    .eq('status', 'approved')
+    .eq('domain', domainName)
+    .eq('cert_level', 'EMT');
+
+  if (error) throw error;
+  if (!data || data.length === 0) throw new Error('No approved questions available for this domain.');
+
+  console.log('Raw data from Supabase:', data);
+
+  const letterToIndex = { A: 0, B: 1, C: 2, D: 3 };
+
+  const mapped = data.map(q => ({
+    question: q.question_text,
+    options: [q.option_a, q.option_b, q.option_c, q.option_d],
+    correct: letterToIndex[q.correct_answer],
+    explanation: q.explanation,
+  }));
+
+  return mapped.sort(() => Math.random() - 0.5).slice(0, 10);
 };
 
 const LETTERS = ['A', 'B', 'C', 'D'];
@@ -26,10 +42,10 @@ const QuizSession = ({ domain, onExit }) => {
   useEffect(() => {
     const load = async () => {
       try {
-        const qs = await generateQuestions(domain.name);
+        const qs = await fetchApprovedQuestions(domain.name);
         setQuestions(qs);
       } catch (err) {
-        setError('Failed to generate questions. Check your API key and try again.');
+        setError(err.message || 'Failed to load questions. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -74,7 +90,7 @@ const QuizSession = ({ domain, onExit }) => {
   if (loading) return (
     <div style={{ minHeight: '100vh', backgroundColor: '#0a0f1e', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
       <div style={{ fontSize: '36px' }}>{domain.icon}</div>
-      <p style={{ color: '#3b82f6', fontSize: '16px', fontWeight: '600' }}>Generating questions...</p>
+      <p style={{ color: '#3b82f6', fontSize: '16px', fontWeight: '600' }}>Loading questions...</p>
       <p style={{ color: '#6b7280', fontSize: '13px' }}>{domain.name}</p>
     </div>
   );
